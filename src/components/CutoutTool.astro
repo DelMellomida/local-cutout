@@ -1,0 +1,1050 @@
+<section class="tool" aria-labelledby="tool-heading">
+  <h2 id="tool-heading" class="sr-only">Choose an image to remove its background</h2>
+
+  <div id="upload-view">
+    <label class="drop-zone" id="drop-zone" for="image-input">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="34" height="34">
+        <path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <span class="drop-title">Drop an image here</span>
+      <span class="drop-or">or</span>
+      <span class="button">Choose image</span>
+      <span class="drop-help">PNG, JPG, or WebP · up to 20 MB</span>
+      <input id="image-input" type="file" accept="image/png,image/jpeg,image/webp" />
+    </label>
+    <p class="privacy-line">
+      <svg aria-hidden="true" viewBox="0 0 24 24" width="18" height="18">
+        <path d="M7 10V7a5 5 0 0110 0v3m-11 0h12v10H6V10z" fill="none" stroke="currentColor" stroke-width="1.8"></path>
+      </svg>
+      Your image stays on this device. It is never uploaded.
+    </p>
+  </div>
+
+  <div id="working-view" class="working" hidden aria-live="polite">
+    <div class="working-mark" aria-hidden="true"></div>
+    <p id="status-title" class="status-title">Preparing your image…</p>
+    <p id="status-detail" class="status-detail">This may take a moment.</p>
+    <div class="progress-track" id="progress-track" hidden>
+      <div id="progress-bar" class="progress-bar"></div>
+    </div>
+  </div>
+
+  <div id="error-view" class="error-box" hidden role="alert">
+    <strong>We couldn’t make that cutout.</strong>
+    <p id="error-message"></p>
+    <div class="error-actions">
+      <button id="retry-button" type="button">Try again</button>
+      <button id="error-reset-button" type="button" class="secondary">Choose another image</button>
+    </div>
+  </div>
+
+  <div id="result-view" hidden>
+    <div class="result-heading">
+      <div>
+        <p class="eyebrow" id="result-eyebrow">Cutout ready</p>
+        <h2>Background removed</h2>
+      </div>
+      <button id="reset-button" type="button" class="secondary">Start over</button>
+    </div>
+
+    <div class="accuracy-upgrade">
+      <div>
+        <strong>Need finer edges?</strong>
+        <p id="accuracy-status">Accurate mode is checked after your first result.</p>
+      </div>
+      <button id="accuracy-button" type="button" class="secondary">Improve accuracy</button>
+      <div id="accuracy-progress" class="accuracy-progress" hidden aria-live="polite">
+        <span id="accuracy-progress-label">Preparing accurate model…</span>
+        <div class="progress-track">
+          <div id="accuracy-progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+      <p id="accuracy-error" class="accuracy-error" hidden role="alert"></p>
+    </div>
+
+    <div class="comparison" id="comparison">
+      <div class="preview checkerboard" id="preview-wrap">
+        <canvas id="result-canvas" aria-label="Image with its background removed"></canvas>
+      </div>
+      <div class="before-panel" id="before-panel">
+        <img id="before-image" alt="Original uploaded image" />
+      </div>
+      <input
+        id="compare-slider"
+        class="compare-slider"
+        type="range"
+        min="0"
+        max="100"
+        value="50"
+        aria-label="Compare original and cutout"
+      />
+      <span class="compare-label before-label">Original</span>
+      <span class="compare-label after-label">Cutout</span>
+    </div>
+
+    <div class="editor-controls" aria-label="Manual cutout editing controls">
+      <div class="mode-buttons" role="group" aria-label="Editing mode">
+        <button id="compare-mode-button" type="button" class="secondary active" aria-pressed="true">Compare</button>
+        <button id="restore-mode-button" type="button" class="secondary" aria-pressed="false">Restore</button>
+        <button id="erase-mode-button" type="button" class="secondary" aria-pressed="false">Erase</button>
+      </div>
+      <label class="brush-size" for="brush-size">
+        Brush size
+        <input id="brush-size" type="range" min="8" max="160" value="48" />
+        <output id="brush-size-value" for="brush-size">48 px</output>
+      </label>
+      <button id="undo-button" type="button" class="secondary" disabled>Undo stroke</button>
+    </div>
+    <p id="edit-help" class="edit-help" aria-live="polite">Compare the original and cutout with the slider.</p>
+
+    <div class="result-controls">
+      <fieldset>
+        <legend>Preview background</legend>
+        <div class="swatches">
+          <button type="button" class="swatch checker active" data-background="checkerboard" aria-label="Checkerboard background" aria-pressed="true"></button>
+          <button type="button" class="swatch white" data-background="white" aria-label="White background" aria-pressed="false"></button>
+          <button type="button" class="swatch black" data-background="black" aria-label="Black background" aria-pressed="false"></button>
+        </div>
+      </fieldset>
+      <button id="download-button" type="button">
+        <svg aria-hidden="true" viewBox="0 0 24 24" width="20" height="20">
+          <path d="M12 4v12m0 0l-5-5m5 5 5-5M5 20h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+        Download PNG
+      </button>
+    </div>
+  </div>
+</section>
+
+<script>
+  import { paintBrush, type BrushMode } from '../lib/brush';
+  import { MAX_PIXELS, safePngName, scaledDimensions, validateImageFile } from '../lib/image';
+
+  const input = required<HTMLInputElement>('image-input');
+  const dropZone = required<HTMLElement>('drop-zone');
+  const uploadView = required<HTMLElement>('upload-view');
+  const workingView = required<HTMLElement>('working-view');
+  const errorView = required<HTMLElement>('error-view');
+  const resultView = required<HTMLElement>('result-view');
+  const statusTitle = required<HTMLElement>('status-title');
+  const statusDetail = required<HTMLElement>('status-detail');
+  const progressTrack = required<HTMLElement>('progress-track');
+  const progressBar = required<HTMLElement>('progress-bar');
+  const errorMessage = required<HTMLElement>('error-message');
+  const retryButton = required<HTMLButtonElement>('retry-button');
+  const resetButton = required<HTMLButtonElement>('reset-button');
+  const errorResetButton = required<HTMLButtonElement>('error-reset-button');
+  const downloadButton = required<HTMLButtonElement>('download-button');
+  const beforeImage = required<HTMLImageElement>('before-image');
+  const resultCanvas = required<HTMLCanvasElement>('result-canvas');
+  const compareSlider = required<HTMLInputElement>('compare-slider');
+  const beforePanel = required<HTMLElement>('before-panel');
+  const previewWrap = required<HTMLElement>('preview-wrap');
+  const comparison = required<HTMLElement>('comparison');
+  const compareModeButton = required<HTMLButtonElement>('compare-mode-button');
+  const restoreModeButton = required<HTMLButtonElement>('restore-mode-button');
+  const eraseModeButton = required<HTMLButtonElement>('erase-mode-button');
+  const brushSize = required<HTMLInputElement>('brush-size');
+  const brushSizeValue = required<HTMLOutputElement>('brush-size-value');
+  const undoButton = required<HTMLButtonElement>('undo-button');
+  const editHelp = required<HTMLElement>('edit-help');
+  const resultEyebrow = required<HTMLElement>('result-eyebrow');
+  const accuracyButton = required<HTMLButtonElement>('accuracy-button');
+  const accuracyStatus = required<HTMLElement>('accuracy-status');
+  const accuracyProgress = required<HTMLElement>('accuracy-progress');
+  const accuracyProgressLabel = required<HTMLElement>('accuracy-progress-label');
+  const accuracyProgressBar = required<HTMLElement>('accuracy-progress-bar');
+  const accuracyError = required<HTMLElement>('accuracy-error');
+
+  let worker: Worker | null = null;
+  let currentFile: File | null = null;
+  let originalUrl: string | null = null;
+  let sourcePixels: Uint8ClampedArray | null = null;
+  let sourceWidth = 0;
+  let sourceHeight = 0;
+  let editMode: BrushMode | 'compare' = 'compare';
+  let drawing = false;
+  let lastPoint: { x: number; y: number } | null = null;
+  let undoPixels: ImageData | null = null;
+  let currentQuality: 'fast' | 'accurate' = 'fast';
+  let hasManualEdits = false;
+  let isAccurateRunning = false;
+  const supportsWebGPU = 'gpu' in navigator;
+
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) void acceptFile(file);
+  });
+
+  for (const eventName of ['dragenter', 'dragover']) {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+  }
+
+  for (const eventName of ['dragleave', 'drop']) {
+    dropZone.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      dropZone.classList.remove('drag-over');
+    });
+  }
+
+  dropZone.addEventListener('drop', (event) => {
+    const file = event.dataTransfer?.files[0];
+    if (file) void acceptFile(file);
+  });
+
+  resetButton.addEventListener('click', reset);
+  errorResetButton.addEventListener('click', reset);
+  retryButton.addEventListener('click', () => {
+    if (sourcePixels) processPixels('fast');
+    else if (currentFile) void acceptFile(currentFile);
+  });
+
+  accuracyButton.addEventListener('click', () => {
+    if (!supportsWebGPU || hasManualEdits || !sourcePixels) return;
+    processPixels('accurate');
+  });
+
+  downloadButton.addEventListener('click', () => {
+    resultCanvas.toBlob((blob) => {
+      if (!blob) {
+        showError('The PNG could not be created. Please try again.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = safePngName(currentFile?.name ?? 'cutout');
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    }, 'image/png');
+  });
+
+  compareSlider.addEventListener('input', () => {
+    beforePanel.style.clipPath = `inset(0 ${100 - Number(compareSlider.value)}% 0 0)`;
+  });
+
+  compareModeButton.addEventListener('click', () => setEditMode('compare'));
+  restoreModeButton.addEventListener('click', () => setEditMode('restore'));
+  eraseModeButton.addEventListener('click', () => setEditMode('erase'));
+
+  brushSize.addEventListener('input', () => {
+    brushSizeValue.value = `${brushSize.value} px`;
+  });
+
+  undoButton.addEventListener('click', () => {
+    if (!undoPixels) return;
+    const context = resultCanvas.getContext('2d');
+    if (!context) return;
+    context.putImageData(undoPixels, 0, 0);
+    undoPixels = null;
+    undoButton.disabled = true;
+  });
+
+  resultCanvas.addEventListener('pointerdown', (event) => {
+    if (editMode === 'compare' || !sourcePixels || isAccurateRunning) return;
+    const point = canvasPoint(event);
+    if (!point) return;
+    const context = resultCanvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+    event.preventDefault();
+    resultCanvas.setPointerCapture(event.pointerId);
+    undoPixels = context.getImageData(0, 0, resultCanvas.width, resultCanvas.height);
+    undoButton.disabled = false;
+    lockAccuracyAfterEdit();
+    drawing = true;
+    lastPoint = point;
+    paintAt(point, point);
+  });
+
+  resultCanvas.addEventListener('pointermove', (event) => {
+    if (!drawing || !lastPoint) return;
+    const point = canvasPoint(event);
+    if (!point) return;
+    event.preventDefault();
+    paintAt(lastPoint, point);
+    lastPoint = point;
+  });
+
+  resultCanvas.addEventListener('pointerup', endDrawing);
+  resultCanvas.addEventListener('pointercancel', endDrawing);
+
+  function endDrawing(event: PointerEvent) {
+    if (!drawing) return;
+    drawing = false;
+    lastPoint = null;
+    if (resultCanvas.hasPointerCapture(event.pointerId)) {
+      resultCanvas.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('[data-background]').forEach((button) => {
+    button.addEventListener('click', () => {
+      previewWrap.classList.remove('checkerboard', 'white-bg', 'black-bg');
+      const background = button.dataset.background;
+      previewWrap.classList.add(
+        background === 'white' ? 'white-bg' : background === 'black' ? 'black-bg' : 'checkerboard',
+      );
+      document.querySelectorAll<HTMLButtonElement>('[data-background]').forEach((item) => {
+        const active = item === button;
+        item.classList.toggle('active', active);
+        item.setAttribute('aria-pressed', String(active));
+      });
+    });
+  });
+
+  async function acceptFile(file: File) {
+    currentFile = file;
+    showWorking('Checking your image…', 'Nothing is uploaded. This happens on your device.');
+    const validation = await validateImageFile(file);
+    if (!validation.ok) {
+      showError(validation.message, false);
+      return;
+    }
+
+    try {
+      const bitmap = await createImageBitmap(file);
+      if (bitmap.width * bitmap.height > MAX_PIXELS) {
+        bitmap.close();
+        showError('This image has more than 40 megapixels. Choose a smaller image.', false);
+        return;
+      }
+
+      const dimensions = scaledDimensions(bitmap.width, bitmap.height);
+      const canvas = document.createElement('canvas');
+      canvas.width = dimensions.width;
+      canvas.height = dimensions.height;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      if (!context) throw new Error('Your browser could not prepare the image canvas.');
+      context.drawImage(bitmap, 0, 0, dimensions.width, dimensions.height);
+      bitmap.close();
+
+      sourcePixels = context.getImageData(0, 0, dimensions.width, dimensions.height).data;
+      sourceWidth = dimensions.width;
+      sourceHeight = dimensions.height;
+
+      if (originalUrl) URL.revokeObjectURL(originalUrl);
+      originalUrl = URL.createObjectURL(file);
+      beforeImage.src = originalUrl;
+      processPixels('fast');
+    } catch {
+      showError('This image could not be decoded. It may be damaged or use an unsupported format.', false);
+    }
+  }
+
+  function processPixels(quality: 'fast' | 'accurate') {
+    if (!sourcePixels) return;
+    if (quality === 'fast') {
+      showWorking('Loading the cutout model…', 'The model is downloaded once, then cached by your browser.', true);
+    } else {
+      isAccurateRunning = true;
+      setEditMode('compare');
+      setEditorDisabled(true);
+      accuracyButton.disabled = true;
+      accuracyError.hidden = true;
+      accuracyProgress.hidden = false;
+      accuracyProgressLabel.textContent = 'Preparing accurate model…';
+      accuracyProgressBar.style.width = '0%';
+    }
+    ensureWorker(quality);
+    const copy = sourcePixels.slice();
+    worker?.postMessage(
+      { type: 'process', quality, pixels: copy.buffer, width: sourceWidth, height: sourceHeight },
+      [copy.buffer],
+    );
+  }
+
+  function ensureWorker(quality: 'fast' | 'accurate') {
+    if (worker) worker.terminate();
+    worker = new Worker(new URL('../workers/segment.worker.ts', import.meta.url), { type: 'module' });
+    worker.addEventListener('message', (event) => {
+      const message = event.data;
+      if (message.type === 'status') {
+        if (message.quality === 'accurate') {
+          updateAccuracyProgress(message.stage, message.progress);
+        } else if (message.stage === 'loading') {
+          statusTitle.textContent = 'Loading the cutout model…';
+          statusDetail.textContent = `${message.progress ?? 0}% downloaded`;
+          progressTrack.hidden = false;
+          progressBar.style.width = `${message.progress ?? 0}%`;
+        } else {
+          statusTitle.textContent = 'Removing the background…';
+          statusDetail.textContent = 'You can keep scrolling while the model works.';
+          progressTrack.hidden = true;
+        }
+      } else if (message.type === 'result') {
+        worker?.terminate();
+        worker = null;
+        drawResult(message.pixels, message.width, message.height, message.quality);
+      } else if (message.type === 'error') {
+        worker?.terminate();
+        worker = null;
+        if (message.quality === 'accurate') {
+          showAccuracyError(message.message);
+        } else {
+          console.error('[Local Cutout] Fast mode failed:', message.message);
+          showError('The cutout model could not load or run. Check your connection, then try again.');
+        }
+      }
+    });
+    worker.addEventListener('error', (event) => {
+      worker?.terminate();
+      worker = null;
+      if (quality === 'accurate') {
+        showAccuracyError(event.message);
+      } else {
+        console.error('[Local Cutout] Fast worker failed:', event.message);
+        showError('The cutout worker stopped unexpectedly. Please try again.');
+      }
+    });
+  }
+
+  function drawResult(
+    buffer: ArrayBuffer,
+    width: number,
+    height: number,
+    quality: 'fast' | 'accurate',
+  ) {
+    resultCanvas.width = width;
+    resultCanvas.height = height;
+    const context = resultCanvas.getContext('2d');
+    if (!context) {
+      showError('Your browser could not display the result.');
+      return;
+    }
+    const pixels = new Uint8ClampedArray(buffer);
+    context.putImageData(new ImageData(pixels, width, height), 0, 0);
+    beforePanel.style.clipPath = 'inset(0 50% 0 0)';
+    compareSlider.value = '50';
+    undoPixels = null;
+    undoButton.disabled = true;
+    currentQuality = quality;
+    hasManualEdits = false;
+    isAccurateRunning = false;
+    setEditorDisabled(false);
+    resultEyebrow.textContent = quality === 'accurate' ? 'Accurate cutout ready' : 'Cutout ready';
+    configureAccuracyAction();
+    setEditMode('compare');
+    uploadView.hidden = true;
+    workingView.hidden = true;
+    errorView.hidden = true;
+    resultView.hidden = false;
+    resultView.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function configureAccuracyAction() {
+    accuracyProgress.hidden = true;
+    accuracyError.hidden = true;
+    if (currentQuality === 'accurate') {
+      accuracyButton.disabled = true;
+      accuracyButton.textContent = 'Accurate result';
+      accuracyStatus.textContent =
+        'BiRefNet Lite produced this result. You can now make final brush corrections.';
+    } else if (!supportsWebGPU) {
+      accuracyButton.disabled = true;
+      accuracyButton.textContent = 'Accurate mode unavailable';
+      accuracyStatus.textContent =
+        'Accurate mode needs WebGPU. Use Restore and Erase for detailed corrections.';
+    } else {
+      accuracyButton.disabled = false;
+      accuracyButton.textContent = 'Improve accuracy';
+      accuracyStatus.textContent =
+        'Better for hair, fur, and difficult edges. Downloads about 100 MB once.';
+    }
+  }
+
+  function updateAccuracyProgress(stage: 'loading' | 'processing', progress?: number) {
+    accuracyProgress.hidden = false;
+    if (stage === 'loading') {
+      const percent = Math.max(0, Math.min(100, progress ?? 0));
+      accuracyProgressLabel.textContent = `Loading accurate model… ${percent}%`;
+      accuracyProgressBar.style.width = `${percent}%`;
+    } else {
+      accuracyProgressLabel.textContent = 'Refining difficult edges…';
+      accuracyProgressBar.style.width = '100%';
+    }
+  }
+
+  function showAccuracyError(detail?: string) {
+    isAccurateRunning = false;
+    setEditorDisabled(false);
+    accuracyProgress.hidden = true;
+    accuracyError.hidden = false;
+    const explanation = detail?.trim() || 'The WebGPU worker stopped unexpectedly.';
+    accuracyError.textContent =
+      'Accurate mode could not finish in this browser. Your current result is safe—try again or use Restore and Erase to refine it.';
+    console.error('[Local Cutout] Accurate mode failed:', explanation);
+    accuracyButton.disabled = false;
+    accuracyButton.textContent = 'Retry accurate mode';
+  }
+
+  function lockAccuracyAfterEdit() {
+    if (hasManualEdits) return;
+    hasManualEdits = true;
+    if (currentQuality === 'fast') {
+      accuracyButton.disabled = true;
+      accuracyStatus.textContent =
+        'Accurate mode is disabled after brush editing. Start over to use it first.';
+    }
+  }
+
+  function setEditorDisabled(disabled: boolean) {
+    compareModeButton.disabled = disabled;
+    restoreModeButton.disabled = disabled;
+    eraseModeButton.disabled = disabled;
+    brushSize.disabled = disabled;
+    undoButton.disabled = disabled || undoPixels === null;
+  }
+
+  function setEditMode(mode: BrushMode | 'compare') {
+    editMode = mode;
+    comparison.classList.toggle('editing', mode !== 'compare');
+    const buttons = [compareModeButton, restoreModeButton, eraseModeButton];
+    const modes: Array<BrushMode | 'compare'> = ['compare', 'restore', 'erase'];
+    buttons.forEach((button, index) => {
+      const active = modes[index] === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    if (mode === 'compare') {
+      beforePanel.style.clipPath = `inset(0 ${100 - Number(compareSlider.value)}% 0 0)`;
+      editHelp.textContent = 'Compare the original and cutout with the slider.';
+    } else {
+      beforePanel.style.clipPath = 'inset(0 100% 0 0)';
+      editHelp.textContent =
+        mode === 'restore'
+          ? 'Paint over missing parts to restore pixels from the original.'
+          : 'Paint over unwanted parts to make them transparent.';
+    }
+  }
+
+  function canvasPoint(event: PointerEvent): { x: number; y: number } | null {
+    const rect = resultCanvas.getBoundingClientRect();
+    const scale = Math.min(rect.width / resultCanvas.width, rect.height / resultCanvas.height);
+    const renderedWidth = resultCanvas.width * scale;
+    const renderedHeight = resultCanvas.height * scale;
+    const offsetX = (rect.width - renderedWidth) / 2;
+    const offsetY = (rect.height - renderedHeight) / 2;
+    const x = (event.clientX - rect.left - offsetX) / scale;
+    const y = (event.clientY - rect.top - offsetY) / scale;
+    if (x < 0 || y < 0 || x >= resultCanvas.width || y >= resultCanvas.height) return null;
+    return { x, y };
+  }
+
+  function paintAt(from: { x: number; y: number }, to: { x: number; y: number }) {
+    if (editMode === 'compare' || !sourcePixels) return;
+    const context = resultCanvas.getContext('2d', { willReadFrequently: true });
+    if (!context) return;
+    const image = context.getImageData(0, 0, resultCanvas.width, resultCanvas.height);
+    const radius = Number(brushSize.value) / 2;
+    const distance = Math.hypot(to.x - from.x, to.y - from.y);
+    const steps = Math.max(1, Math.ceil(distance / Math.max(1, radius / 2)));
+    for (let step = 0; step <= steps; step += 1) {
+      const ratio = step / steps;
+      paintBrush(
+        image.data,
+        sourcePixels,
+        resultCanvas.width,
+        resultCanvas.height,
+        from.x + (to.x - from.x) * ratio,
+        from.y + (to.y - from.y) * ratio,
+        radius,
+        editMode,
+      );
+    }
+    context.putImageData(image, 0, 0);
+  }
+
+  function showWorking(title: string, detail: string, progress = false) {
+    uploadView.hidden = true;
+    resultView.hidden = true;
+    errorView.hidden = true;
+    workingView.hidden = false;
+    statusTitle.textContent = title;
+    statusDetail.textContent = detail;
+    progressTrack.hidden = !progress;
+    progressBar.style.width = '0%';
+  }
+
+  function showError(message: string, retryable = true) {
+    uploadView.hidden = true;
+    resultView.hidden = true;
+    workingView.hidden = true;
+    errorView.hidden = false;
+    errorMessage.textContent = message;
+    retryButton.hidden = !retryable;
+    errorView.focus();
+  }
+
+  function reset() {
+    worker?.terminate();
+    worker = null;
+    if (originalUrl) URL.revokeObjectURL(originalUrl);
+    originalUrl = null;
+    currentFile = null;
+    sourcePixels = null;
+    sourceWidth = 0;
+    sourceHeight = 0;
+    undoPixels = null;
+    currentQuality = 'fast';
+    hasManualEdits = false;
+    isAccurateRunning = false;
+    drawing = false;
+    lastPoint = null;
+    input.value = '';
+    resultCanvas.width = 0;
+    resultCanvas.height = 0;
+    beforeImage.removeAttribute('src');
+    workingView.hidden = true;
+    errorView.hidden = true;
+    resultView.hidden = true;
+    accuracyProgress.hidden = true;
+    accuracyError.hidden = true;
+    uploadView.hidden = false;
+    input.focus();
+  }
+
+  function required<T extends HTMLElement>(id: string): T {
+    const element = document.getElementById(id);
+    if (!element) throw new Error(`Missing #${id}`);
+    return element as T;
+  }
+</script>
+
+<style>
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .tool {
+    margin-top: 2.5rem;
+  }
+
+  .drop-zone {
+    min-height: 330px;
+    border: 2px dashed #9aaba2;
+    border-radius: var(--radius);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding: 2rem;
+    cursor: pointer;
+    color: var(--muted);
+    transition: border-color 140ms ease, background-color 140ms ease;
+  }
+
+  .drop-zone:hover,
+  .drop-zone.drag-over,
+  .drop-zone:focus-within {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  .drop-zone input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  .drop-title {
+    color: var(--ink);
+    font-size: clamp(1.35rem, 3vw, 1.75rem);
+    font-weight: 800;
+  }
+
+  .drop-or,
+  .drop-help {
+    font-size: 0.92rem;
+  }
+
+  .privacy-line {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .working,
+  .error-box {
+    min-height: 330px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+
+  .working-mark {
+    width: 52px;
+    height: 52px;
+    border: 4px solid var(--accent-soft);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 850ms linear infinite;
+  }
+
+  .status-title {
+    margin: 1.2rem 0 0.25rem;
+    color: var(--ink);
+    font-size: 1.25rem;
+    font-weight: 800;
+  }
+
+  .status-detail,
+  .error-box p {
+    color: var(--muted);
+  }
+
+  .progress-track {
+    width: min(100%, 420px);
+    height: 8px;
+    margin-top: 1rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--accent-soft);
+  }
+
+  .progress-bar {
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+    transition: width 180ms ease;
+  }
+
+  .error-box {
+    border-color: #e0aaa8;
+  }
+
+  .error-box strong {
+    color: var(--danger);
+    font-size: 1.25rem;
+  }
+
+  .error-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    justify-content: center;
+  }
+
+  .result-heading,
+  .result-controls {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .result-heading h2 {
+    margin: 0.25rem 0 1.5rem;
+  }
+
+  .result-heading p {
+    margin: 0;
+  }
+
+  .accuracy-upgrade {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.75rem 1.5rem;
+    margin-bottom: 1.25rem;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--accent-soft);
+  }
+
+  .accuracy-upgrade strong {
+    display: block;
+    color: var(--ink);
+  }
+
+  .accuracy-upgrade p,
+  .accuracy-progress span {
+    margin: 0.15rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  .accuracy-progress,
+  .accuracy-error {
+    grid-column: 1 / -1;
+  }
+
+  .accuracy-progress .progress-track {
+    width: 100%;
+    margin-top: 0.5rem;
+    background: var(--surface);
+  }
+
+  .accuracy-upgrade .accuracy-error {
+    color: var(--danger);
+    font-weight: 650;
+  }
+
+  .comparison {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: white;
+    aspect-ratio: 16 / 10;
+  }
+
+  .preview,
+  .before-panel {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .preview canvas,
+  .before-panel img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .comparison.editing canvas {
+    cursor: crosshair;
+    touch-action: none;
+  }
+
+  .before-panel {
+    clip-path: inset(0 50% 0 0);
+    pointer-events: none;
+  }
+
+  .checkerboard {
+    background-color: #fff;
+    background-image: linear-gradient(45deg, #d8ddd9 25%, transparent 25%),
+      linear-gradient(-45deg, #d8ddd9 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #d8ddd9 75%),
+      linear-gradient(-45deg, transparent 75%, #d8ddd9 75%);
+    background-size: 28px 28px;
+    background-position: 0 0, 0 14px, 14px -14px, -14px 0;
+  }
+
+  .white-bg {
+    background: white;
+  }
+
+  .black-bg {
+    background: #111;
+  }
+
+  .compare-slider {
+    position: absolute;
+    z-index: 3;
+    inset: auto 1rem 1rem;
+    width: calc(100% - 2rem);
+    accent-color: var(--accent);
+  }
+
+  .comparison.editing .compare-slider,
+  .comparison.editing .compare-label {
+    display: none;
+  }
+
+  .compare-label {
+    position: absolute;
+    z-index: 2;
+    top: 1rem;
+    border-radius: 999px;
+    background: rgb(23 33 29 / 78%);
+    color: white;
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+  }
+
+  .before-label {
+    left: 1rem;
+  }
+
+  .after-label {
+    right: 1rem;
+  }
+
+  .result-controls {
+    margin-top: 1.25rem;
+  }
+
+  .editor-controls {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .mode-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .mode-buttons button.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  .brush-size {
+    display: grid;
+    grid-template-columns: minmax(100px, 180px) auto;
+    gap: 0.2rem 0.75rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .brush-size input {
+    grid-column: 1;
+    min-height: 32px;
+    accent-color: var(--accent);
+  }
+
+  .brush-size output {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    min-width: 44px;
+  }
+
+  .edit-help {
+    margin: 0.65rem 0 0;
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  fieldset {
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  legend {
+    margin-bottom: 0.45rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+  }
+
+  .swatches {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .swatch {
+    min-width: 44px;
+    width: 44px;
+    padding: 0;
+    border: 2px solid var(--line);
+    border-radius: 50%;
+  }
+
+  .swatch.active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--accent);
+  }
+
+  .swatch.checker {
+    background: repeating-conic-gradient(#d8ddd9 0 25%, #fff 0 50%) 50% / 12px 12px;
+  }
+
+  .swatch.white {
+    background: white;
+  }
+
+  .swatch.black {
+    background: #111;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (max-width: 600px) {
+    .drop-zone,
+    .working,
+    .error-box {
+      min-height: 280px;
+      padding: 1.25rem;
+    }
+
+    .result-heading,
+    .result-controls {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+
+    .editor-controls {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .accuracy-upgrade {
+      grid-template-columns: 1fr;
+    }
+
+    .accuracy-upgrade button {
+      width: 100%;
+    }
+
+    .mode-buttons button {
+      flex: 1;
+    }
+
+    .comparison {
+      aspect-ratio: 4 / 5;
+    }
+
+    #download-button {
+      width: 100%;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .working-mark {
+      animation: none;
+    }
+  }
+</style>

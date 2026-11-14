@@ -1,0 +1,49 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Privacy: Your Image Never Leaves | Local Cutout';
+const description =
+  'Local Cutout processes images in your browser, uses no accounts or cookies, and never uploads your photos.';
+---
+
+<BaseLayout {title} {description} path="/privacy/">
+  <article class="shell prose">
+    <p class="eyebrow">Privacy</p>
+    <h1>Your image never leaves your device</h1>
+    <p class="lead">
+      Local Cutout has no image server, account system, database, cookies, or analytics.
+    </p>
+
+    <h2>What the tool processes</h2>
+    <p>
+      The image you choose is decoded, resized, processed, previewed, and exported in memory inside
+      your current browser tab. Starting over releases the temporary image URL and working pixels.
+    </p>
+
+    <h2>What the network downloads</h2>
+    <p>
+      The site downloads its own HTML, CSS, JavaScript, and font. Its version-pinned ONNX WebAssembly
+      runtime is delivered by jsDelivr. On your first cutout, it also downloads the pinned MODNet
+      model files through this site's restricted Cloudflare route from Hugging Face. These files
+      describe the processing model; they do not contain or receive your image. If you choose Improve
+      accuracy on a WebGPU device, the browser downloads an additional BiRefNet Lite model of about
+      100 MB through the same route. Your pixels are still processed only inside the browser worker.
+    </p>
+
+    <h2>What we do not collect</h2>
+    <ul>
+      <li>No original or processed images</li>
+      <li>No names, email addresses, or accounts</li>
+      <li>No cookies or cross-site tracking</li>
+      <li>No usage analytics</li>
+    </ul>
+
+    <h2>How to verify the claim</h2>
+    <p>
+      Open your browser’s developer tools, select the Network panel, process an image, and inspect the
+      requests. You will see model and runtime downloads, but no request body containing image data.
+    </p>
+
+    <p><a class="button" href="/">Return to the tool</a></p>
+  </article>
+</BaseLayout>

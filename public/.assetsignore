@@ -1,0 +1,4 @@
+# Transformers.js selects its version-pinned jsDelivr runtime in a dedicated
+# worker. Vite also emits this unused local fallback, which exceeds Cloudflare's
+# 25 MiB per-asset limit.
+_astro/ort-wasm-simd-threaded.asyncify-*.wasm

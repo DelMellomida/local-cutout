@@ -1,0 +1,15 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Page Not Found | Local Cutout';
+const description = 'The page you requested could not be found. Return to Local Cutout to remove an image background privately.';
+---
+
+<BaseLayout {title} {description} path="/404.html">
+  <div class="shell prose">
+    <p class="eyebrow">404</p>
+    <h1>This page has no background—or foreground</h1>
+    <p class="lead">The address may be mistyped or the page may have moved.</p>
+    <p><a class="button" href="/">Return to Local Cutout</a></p>
+  </div>
+</BaseLayout>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#fbfcf8"/>
+  <rect x="70" y="70" width="1060" height="490" rx="32" fill="#e7f2ec" stroke="#176b4d" stroke-width="3"/>
+  <path d="M830 175v280h280M830 315h140V175" fill="none" stroke="#176b4d" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="140" y="265" fill="#17211d" font-family="sans-serif" font-size="82" font-weight="700">Local Cutout</text>
+  <text x="140" y="350" fill="#56635d" font-family="sans-serif" font-size="38">Private background removal, in your browser.</text>
+  <text x="140" y="425" fill="#176b4d" font-family="sans-serif" font-size="30" font-weight="700">No upload · No account · No watermark</text>
+</svg>

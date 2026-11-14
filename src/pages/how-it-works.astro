@@ -1,0 +1,51 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'How Private Background Removal Works | Local Cutout';
+const description =
+  'See how Local Cutout validates, resizes, and removes an image background entirely inside your web browser.';
+---
+
+<BaseLayout {title} {description} path="/how-it-works/">
+  <article class="shell prose">
+    <p class="eyebrow">Behind the cutout</p>
+    <h1>How browser-only background removal works</h1>
+    <p class="lead">
+      Local Cutout turns a photo into a transparent PNG without sending the photo to a server.
+    </p>
+
+    <h2>1. Your browser checks the file</h2>
+    <p>
+      The tool accepts PNG, JPG, and WebP images up to 20 MB. It checks the file contents—not just
+      the extension—then refuses images over 40 megapixels before processing them.
+    </p>
+
+    <h2>2. Large images are resized</h2>
+    <p>
+      Images wider or taller than 2,000 pixels are scaled down in memory. This limits processing time
+      and memory use while keeping enough detail for most product photos, profile pictures, and stickers.
+    </p>
+
+    <h2>3. A local model finds the subject</h2>
+    <p>
+      The browser downloads the Apache-2.0 licensed MODNet model from Hugging Face. A Web Worker runs
+      the model away from the page’s main thread, so controls and scrolling remain responsive.
+    </p>
+
+    <h2>4. The result becomes a PNG</h2>
+    <p>
+      The model returns pixels with a transparent background. A canvas previews those pixels on a
+      checkerboard, white, or black background. When you download, the browser encodes the canvas as
+      a PNG with its alpha channel intact.
+    </p>
+
+    <h2>5. Difficult edges can get a second pass</h2>
+    <p>
+      On browsers with WebGPU, Improve accuracy can download the larger BiRefNet Lite model and
+      reprocess the same local pixels. This optional pass is intended for hair, fur, low contrast,
+      and complex objects. Restore and Erase remain available for final corrections.
+    </p>
+
+    <p><a class="button" href="/">Make a cutout</a></p>
+  </article>
+</BaseLayout>

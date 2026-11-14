@@ -1,0 +1,90 @@
+---
+import CutoutTool from '../components/CutoutTool.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const title = 'Remove Image Backgrounds Privately | Local Cutout';
+const description =
+  'Remove an image background for free in your browser. No upload, account, or watermark—your photo stays on your device.';
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'WebApplication',
+  name: 'Local Cutout',
+  url: Astro.site?.toString(),
+  description,
+  applicationCategory: 'MultimediaApplication',
+  operatingSystem: 'Any modern web browser',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+  },
+};
+---
+
+<BaseLayout {title} {description}>
+  <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+  <section class="hero">
+    <div class="shell">
+      <p class="eyebrow">Private by design</p>
+      <h1>Remove image backgrounds in your browser</h1>
+      <p class="lead">
+        Make a transparent PNG in under a minute. No upload, no account, and no watermark.
+      </p>
+      <CutoutTool />
+    </div>
+  </section>
+
+  <section class="section tinted" aria-labelledby="steps-heading">
+    <div class="shell split">
+      <div>
+        <p class="eyebrow">A short trip</p>
+        <h2 id="steps-heading">From photo to clean cutout</h2>
+        <p class="lead">The work happens locally, using a small image model in a separate browser worker.</p>
+      </div>
+      <ol class="steps">
+        <li>
+          <div><strong>Choose an image</strong>Drop a PNG, JPG, or WebP up to 20 MB.</div>
+        </li>
+        <li>
+          <div><strong>Let the browser work</strong>The image is resized, then the model separates subject from background.</div>
+        </li>
+        <li>
+          <div><strong>Download the PNG</strong>Compare the result and save it with transparency intact.</div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section" aria-labelledby="privacy-heading">
+    <div class="shell split">
+      <div>
+        <p class="eyebrow">Nothing to hide</p>
+        <h2 id="privacy-heading">What stays on your device</h2>
+        <p class="lead">
+          Your original image, resized pixels, cutout, and download all remain in this browser tab.
+          Only the open-source model files are downloaded.
+        </p>
+        <a href="/privacy/">Read the plain-language privacy details</a>
+      </div>
+      <div class="faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading">Common questions</h2>
+        <details>
+          <summary>Is Local Cutout really free?</summary>
+          <p>Yes. There is no account, paid tier, watermark, or usage limit.</p>
+        </details>
+        <details>
+          <summary>Does my image get uploaded?</summary>
+          <p>No. The browser downloads a model, then processes your image locally in memory.</p>
+        </details>
+        <details>
+          <summary>Why is the first cutout slower?</summary>
+          <p>The model must download once. Your browser cache makes later visits faster.</p>
+        </details>
+        <details>
+          <summary>Which images work best?</summary>
+          <p>Photos with a clear main subject work best. Fine hair, fur, and low contrast can have rough edges.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
